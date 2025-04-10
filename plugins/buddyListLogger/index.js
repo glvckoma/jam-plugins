@@ -1,11 +1,16 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os'); // Import the os module
 
-// Define file paths relative to the project root directory (where Jam is run from)
-const baseDataPath = path.resolve(process.cwd(), 'data');
-const buddyListLogPath = path.join(baseDataPath, 'buddy_list_log.txt');
+// Determine the base path for log files
+const defaultDataPath = path.resolve(process.cwd(), 'data');
+const desktopPath = path.join(os.homedir(), 'Desktop');
+const basePath = fs.existsSync(defaultDataPath) ? defaultDataPath : desktopPath;
+
+// Define file paths using the determined base path
+const buddyListLogPath = path.join(basePath, 'buddy_list_log.txt');
 // Use a separate ignore file for this plugin
-const ignoredUsernamesPath = path.join(baseDataPath, 'buddy_list_dont_log.txt'); 
+const ignoredUsernamesPath = path.join(basePath, 'buddy_list_dont_log.txt');
 
 // Helper function for delay
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -270,21 +275,28 @@ module.exports = function ({ application, dispatch }) {
 
   // Initialize
   loadIgnoreList();
-  
-  // Ensure data directory exists
-  if (!fs.existsSync(baseDataPath)) {
+
+  // Ensure the determined base directory exists (optional, Desktop should exist)
+  // If basePath is desktopPath, we assume it exists. If it's defaultDataPath, we try to create it.
+  if (basePath === defaultDataPath && !fs.existsSync(basePath)) {
     try {
-      fs.mkdirSync(baseDataPath, { recursive: true });
+      fs.mkdirSync(basePath, { recursive: true });
+      application.consoleMessage({
+        type: 'logger',
+        message: `[Buddy List Logger] Created data directory at: ${basePath}`
+      });
     } catch (error) {
       application.consoleMessage({
         type: 'error',
-        message: `[Buddy List Logger] Error creating data directory: ${error.message}`
+        message: `[Buddy List Logger] Error creating data directory: ${error.message}. Logs will be saved to Desktop.`
       });
+      // If creation fails, we might still fall back to Desktop, but paths are already set.
+      // Consider adding logic here to explicitly reset basePath to desktopPath if creation fails.
     }
   }
 
   application.consoleMessage({
     type: 'success',
-    message: 'Buddy List Logger plugin loaded. Use !buddylog to toggle logging.'
+    message: `Buddy List Logger plugin loaded. Logging to: ${basePath}. Use !buddylog to toggle logging.`
   });
 };
