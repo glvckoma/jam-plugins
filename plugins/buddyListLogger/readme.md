@@ -43,4 +43,4 @@ This means BuddyName was online when logged on April 10, 2025.
 
 ## Author
 
-Cline
+Glockoma
