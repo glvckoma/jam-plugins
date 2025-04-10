@@ -1,0 +1,8 @@
+{
+  "name": "Buddy List Logger",
+  "main": "index.js",
+  "description": "Logs buddy list usernames with enable/disable functionality.",
+  "author": "Cline",
+  "type": "game",
+  "dependencies": {}
+}
