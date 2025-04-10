@@ -36,4 +36,4 @@ The plugin extracts the usernames from these packets and logs them to the `buddy
 
 ## Author
 
-Cline
+Glockoma
