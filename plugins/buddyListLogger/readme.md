@@ -1,38 +1,45 @@
 # Buddy List Logger Plugin for Animal Jam Classic
 
-This plugin automatically logs your buddy list usernames to a file named `buddy_list_log.txt` located in the `data` directory.
+This simple plugin automatically logs your buddy list usernames to a text file. Once installed, it will help you keep track of all your buddies in Animal Jam Classic.
 
-## How It Works
+## How to Use
 
-The plugin hooks into the Animal Jam Classic network traffic to capture buddy list information. It listens for the following packets:
+1. Install the plugin by placing the `buddyListLogger` folder in the `plugins` directory of your Jam installation.
+2. The plugin is turned off by default. To start logging buddies, type `!buddylog on` in the Jam console.
+3. Available commands:
+   * `!buddylog on`: Turns buddy logging on
+   * `!buddylog off`: Turns buddy logging off
+   * `!buddylog`: Toggles logging on/off
+   * `!buddylogpath C:\path\to\folder`: Changes where log files are saved
 
-*   `bl`: This packet contains the initial buddy list and is usually loaded when you log in or when you open your buddy list in the game.
-*   `ba`: This packet is sent when a new buddy is added to your list.
-*   `bon`: This packet is sent when a buddy comes online.
+## Where Files Are Saved
 
-The plugin extracts the usernames from these packets and logs them to the `buddy_list_log.txt` file, along with a timestamp and the buddy's status (online/offline).
+By default, the plugin saves log files in these locations:
 
-## Usage
-
-1.  Install the plugin by placing the `buddyListLogger` folder in the `plugins` directory of your Jam installation.
-2.  The plugin will automatically start logging buddy usernames to `data/buddy_list_log.txt`.
-3.  Use the `!buddylog` command in the Jam console to toggle the logging on or off.
-    *   `!buddylog on` or `!buddylog enable`: Enables buddy list logging.
-    *   `!buddylog off` or `!buddylog disable`: Disables buddy list logging.
-    *   `!buddylog status`: Displays the current logging status.
-4.  Use the `!buddylogclear` command to clear the session log. This will allow the plugin to log the same buddies again in the current session.
+* If the `data` folder exists in your Jam installation, files are saved there
+* If the `data` folder doesn't exist, files are saved to your Desktop
+* You can choose a different folder using the `!buddylogpath` command
 
 ## Important Notes
 
-*   The buddy list is not always loaded immediately upon login. Sometimes, you need to open your buddy list in the game for the plugin to capture the initial list.
-*   The plugin uses a separate ignore list file (`buddy_list_dont_log.txt`) located in the `data` directory. Usernames added to this file will not be logged.
-*   The plugin only logs usernames that are not already in the `buddy_list_dont_log.txt` file and have not been logged in the current session.
-*   The status of buddies (online/offline) is also logged. A status of `1` indicates online, while `0` indicates offline.
+* The buddy list is not always loaded right when you log in. You might need to open your buddy list in the game for the plugin to capture all your buddies.
+* Each buddy is only logged once to prevent duplicate entries.
+* The plugin creates two files:
+  * `buddy_list_log.txt`: Contains your logged buddies with timestamps
+  * `buddy_list_dont_log.txt`: Keeps track of which buddies have already been logged
 
-## Configuration
+## Understanding the Log File
 
-*   `buddy_list_log.txt`: This file contains the logged buddy usernames, timestamps, and status.
-*   `buddy_list_dont_log.txt`: This file contains a list of usernames that should not be logged. Add one username per line.
+Each entry in the log file includes:
+* Date and time when the buddy was logged
+* Buddy's username
+* Buddy's status (0 = online, 1 = offline)
+
+Example:
+```
+2025-04-10T16:25:00.000Z - BuddyName - 0
+```
+This means BuddyName was online when logged on April 10, 2025.
 
 ## Author
 

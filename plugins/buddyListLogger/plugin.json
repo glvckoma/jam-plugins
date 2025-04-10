@@ -2,7 +2,7 @@
   "name": "Buddy List Logger",
   "main": "index.js",
   "description": "Logs buddy list usernames with enable/disable functionality.",
-  "author": "Cline",
+  "author": "Glockoma",
   "type": "game",
   "dependencies": {}
 }

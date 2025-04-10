@@ -2,29 +2,96 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os'); // Import the os module
 
-// Determine the base path for log files
-const defaultDataPath = path.resolve(process.cwd(), 'data');
-const desktopPath = path.join(os.homedir(), 'Desktop');
-const basePath = fs.existsSync(defaultDataPath) ? defaultDataPath : desktopPath;
-
-// Define file paths using the determined base path
-const buddyListLogPath = path.join(basePath, 'buddy_list_log.txt');
-// Use a separate ignore file for this plugin
-const ignoredUsernamesPath = path.join(basePath, 'buddy_list_dont_log.txt');
-
 // Helper function for delay
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 module.exports = function ({ application, dispatch }) {
   // Plugin state
-  let isLoggingEnabled = true;
+  let isLoggingEnabled = false; // Disabled by default
+  let customBasePath = null; // For user-defined log directory
   const loggedBuddiesThisSession = new Set();
   const ignoredUsernames = new Set();
+  
+  // Configuration file path (relative to the current working directory)
+  const configFilePath = path.resolve(process.cwd(), 'plugins', 'buddyListLogger', 'config.json');
+  
+  /**
+   * Loads the plugin configuration from the config file.
+   */
+  const loadConfig = () => {
+    try {
+      if (fs.existsSync(configFilePath)) {
+        const configData = fs.readFileSync(configFilePath, 'utf8');
+        const config = JSON.parse(configData);
+        
+        if (config.customBasePath) {
+          customBasePath = config.customBasePath;
+        }
+        
+        if (config.isLoggingEnabled !== undefined) {
+          isLoggingEnabled = config.isLoggingEnabled;
+        }
+      }
+    } catch (error) {
+      application.consoleMessage({
+        type: 'error',
+        message: `[Buddy List Logger] Error loading config: ${error.message}`
+      });
+    }
+  };
+  
+  /**
+   * Saves the plugin configuration to the config file.
+   */
+  const saveConfig = () => {
+    try {
+      const config = {
+        customBasePath,
+        isLoggingEnabled
+      };
+      
+      const configDir = path.dirname(configFilePath);
+      if (!fs.existsSync(configDir)) {
+        fs.mkdirSync(configDir, { recursive: true });
+      }
+      
+      fs.writeFileSync(configFilePath, JSON.stringify(config, null, 2));
+    } catch (error) {
+      application.consoleMessage({
+        type: 'error',
+        message: `[Buddy List Logger] Error saving config: ${error.message}`
+      });
+    }
+  };
+  
+  // Function to determine the base path for log files
+  const getBasePath = () => {
+    if (customBasePath) {
+      return customBasePath;
+    }
+    
+    const defaultDataPath = path.resolve(process.cwd(), 'data');
+    const desktopPath = path.join(os.homedir(), 'Desktop');
+    
+    // Check if data directory exists
+    return fs.existsSync(defaultDataPath) ? defaultDataPath : desktopPath;
+  };
+  
+  // Function to get file paths based on current base path
+  const getFilePaths = () => {
+    const currentBasePath = getBasePath();
+    return {
+      buddyListLogPath: path.join(currentBasePath, 'buddy_list_log.txt'),
+      ignoredUsernamesPath: path.join(currentBasePath, 'buddy_list_dont_log.txt')
+    };
+  };
 
   /**
    * Reads ignore list file synchronously and populates the ignoredUsernames set.
    */
   const loadIgnoreList = () => {
+    const { ignoredUsernamesPath } = getFilePaths();
+    
     try {
       if (fs.existsSync(ignoredUsernamesPath)) {
         const data = fs.readFileSync(ignoredUsernamesPath, 'utf8');
@@ -36,16 +103,13 @@ module.exports = function ({ application, dispatch }) {
             loadedCount++;
           }
         });
-        
-        application.consoleMessage({
-          type: 'logger',
-          message: `[Buddy List Logger] Loaded ${loadedCount} usernames from buddy_list_dont_log.txt.`
-        });
       } else {
-        application.consoleMessage({
-          type: 'logger',
-          message: '[Buddy List Logger] buddy_list_dont_log.txt not found. All buddies will be logged.'
-        });
+        // Create the file if it doesn't exist
+        try {
+          fs.writeFileSync(ignoredUsernamesPath, '');
+        } catch (error) {
+          // Silent fail - will be handled elsewhere
+        }
       }
     } catch (error) {
       application.consoleMessage({
@@ -56,7 +120,7 @@ module.exports = function ({ application, dispatch }) {
   };
 
   /**
-   * Logs a buddy username to the log file.
+   * Logs a buddy username to the log file and adds it to the ignore list.
    * @param {string} username - The username to log.
    * @param {string} [status='online'] - The buddy's status.
    */
@@ -73,11 +137,17 @@ module.exports = function ({ application, dispatch }) {
     // Add to session log to prevent duplicates
     loggedBuddiesThisSession.add(usernameLower);
     
+    // Add to ignore list to prevent logging in future sessions
+    ignoredUsernames.add(usernameLower);
+    
     // Log to console
     application.consoleMessage({
       type: 'success',
       message: `[Buddy List Logger] Logged buddy: ${username} (${status})`
     });
+    
+    // Get current file paths
+    const { buddyListLogPath, ignoredUsernamesPath } = getFilePaths();
     
     // Append to log file with timestamp
     const timestamp = new Date().toISOString();
@@ -88,6 +158,15 @@ module.exports = function ({ application, dispatch }) {
         application.consoleMessage({
           type: 'error',
           message: `[Buddy List Logger] Error writing to log file: ${err.message}`
+        });
+      });
+      
+    // Also append to ignore list file to prevent future logging
+    fs.promises.appendFile(ignoredUsernamesPath, `${username}\n`)
+      .catch(err => {
+        application.consoleMessage({
+          type: 'error',
+          message: `[Buddy List Logger] Error writing to ignore file: ${err.message}`
         });
       });
   };
@@ -201,12 +280,14 @@ module.exports = function ({ application, dispatch }) {
           type: 'success',
           message: '[Buddy List Logger] Logging enabled.'
         });
+        saveConfig(); // Save the updated state
       } else if (action === 'off' || action === 'disable') {
         isLoggingEnabled = false;
         application.consoleMessage({
           type: 'notify',
           message: '[Buddy List Logger] Logging disabled.'
         });
+        saveConfig(); // Save the updated state
       } else if (action === 'status') {
         application.consoleMessage({
           type: 'logger',
@@ -225,20 +306,53 @@ module.exports = function ({ application, dispatch }) {
         type: isLoggingEnabled ? 'success' : 'notify',
         message: `[Buddy List Logger] Logging ${isLoggingEnabled ? 'enabled' : 'disabled'}.`
       });
+      saveConfig(); // Save the updated state
     }
   };
 
   /**
-   * Clears the session log to allow re-logging of buddies.
+   * Sets a custom directory for log files.
    * @param {object} params - Command parameters.
    * @param {string[]} params.parameters - Command arguments.
    */
-  const handleClearCommand = ({ parameters }) => {
-    loggedBuddiesThisSession.clear();
-    application.consoleMessage({
-      type: 'success',
-      message: '[Buddy List Logger] Session log cleared. Buddies will be logged again on next buddy list update.'
-    });
+  const handleSetPathCommand = ({ parameters }) => {
+    if (parameters.length === 0) {
+      application.consoleMessage({
+        type: 'warn',
+        message: '[Buddy List Logger] Please specify a directory path. Usage: !buddylogpath /path/to/directory'
+      });
+      return;
+    }
+
+    // Join all parameters to handle paths with spaces
+    const newPath = parameters.join(' ');
+    
+    try {
+      // Check if the directory exists
+      if (!fs.existsSync(newPath)) {
+        // Try to create the directory
+        fs.mkdirSync(newPath, { recursive: true });
+      }
+      
+      // Set the custom path
+      customBasePath = newPath;
+      
+      // Save the configuration to persist the custom path
+      saveConfig();
+      
+      // Reload the ignore list with the new path
+      loadIgnoreList();
+      
+      application.consoleMessage({
+        type: 'success',
+        message: `[Buddy List Logger] Log directory set to: ${newPath}`
+      });
+    } catch (error) {
+      application.consoleMessage({
+        type: 'error',
+        message: `[Buddy List Logger] Error setting log directory: ${error.message}`
+      });
+    }
   };
 
   // Register commands
@@ -249,9 +363,9 @@ module.exports = function ({ application, dispatch }) {
   });
 
   dispatch.onCommand({
-    name: 'buddylogclear',
-    description: 'Clears the session log to allow re-logging of buddies.',
-    callback: handleClearCommand
+    name: 'buddylogpath',
+    description: 'Sets a custom directory for log files. Usage: !buddylogpath /path/to/directory',
+    callback: handleSetPathCommand
   });
 
   // Register message hooks
@@ -274,29 +388,50 @@ module.exports = function ({ application, dispatch }) {
   });
 
   // Initialize
+  loadConfig(); // Load configuration first
   loadIgnoreList();
 
-  // Ensure the determined base directory exists (optional, Desktop should exist)
-  // If basePath is desktopPath, we assume it exists. If it's defaultDataPath, we try to create it.
-  if (basePath === defaultDataPath && !fs.existsSync(basePath)) {
+  // Ensure the determined base directory exists
+  const basePath = getBasePath();
+  const { buddyListLogPath, ignoredUsernamesPath } = getFilePaths();
+  
+  // Create the base directory if it doesn't exist
+  if (!fs.existsSync(basePath)) {
     try {
       fs.mkdirSync(basePath, { recursive: true });
-      application.consoleMessage({
-        type: 'logger',
-        message: `[Buddy List Logger] Created data directory at: ${basePath}`
-      });
     } catch (error) {
       application.consoleMessage({
         type: 'error',
-        message: `[Buddy List Logger] Error creating data directory: ${error.message}. Logs will be saved to Desktop.`
+        message: `[Buddy List Logger] Error creating directory: ${error.message}`
       });
-      // If creation fails, we might still fall back to Desktop, but paths are already set.
-      // Consider adding logic here to explicitly reset basePath to desktopPath if creation fails.
+    }
+  }
+  
+  // Create the log files if they don't exist
+  if (!fs.existsSync(buddyListLogPath)) {
+    try {
+      fs.writeFileSync(buddyListLogPath, '');
+    } catch (error) {
+      application.consoleMessage({
+        type: 'error',
+        message: `[Buddy List Logger] Error creating log file: ${error.message}`
+      });
+    }
+  }
+  
+  if (!fs.existsSync(ignoredUsernamesPath)) {
+    try {
+      fs.writeFileSync(ignoredUsernamesPath, '');
+    } catch (error) {
+      application.consoleMessage({
+        type: 'error',
+        message: `[Buddy List Logger] Error creating ignore file: ${error.message}`
+      });
     }
   }
 
   application.consoleMessage({
     type: 'success',
-    message: `Buddy List Logger plugin loaded. Logging to: ${basePath}. Use !buddylog to toggle logging.`
+    message: `[Buddy List Logger] Plugin loaded. Logging to: ${basePath}. Logging is ${isLoggingEnabled ? 'enabled' : 'disabled'}. Use !buddylog to toggle logging.`
   });
 };
