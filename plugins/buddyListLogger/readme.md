@@ -14,7 +14,8 @@ The plugin extracts the usernames from these packets and logs them to the `buddy
 
 ## Usage
 
-1.  Install the plugin by placing the `buddyListLogger` folder in the `plugins` directory of your Jam installation.
+1.  Install the plugin by placing the `buddyListLogger` folder in the `plugins` directory of your Jam installation. 
+   1a. You will move the buddyListLogger folder inside of (C:\Users\*your name*\AppData\Local\Programs\jam\plugins) if you are using the .exe to run jam.
 2.  The plugin will automatically start logging buddy usernames to `data/buddy_list_log.txt`.
 3.  Use the `!buddylog` command in the Jam console to toggle the logging on or off.
     *   `!buddylog on` or `!buddylog enable`: Enables buddy list logging.
