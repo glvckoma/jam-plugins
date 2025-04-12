@@ -39,7 +39,7 @@ You can also use `window.toggleInvis()` in the browser console (F12 or Ctrl+Shif
 
 - Troll your friends or people by making it appear someone is in their den, but they can't see where you are. Or spy on conversations!
 - Become completely invisible to other players.
-- Interesting fact: being invisible causes movement logs to not be sent to the server, which *could* potentially be used to avoid bans when botting or auto-completing minigames (though this is highly speculative and not guaranteed).
+- Interesting fact: being invisible causes movement logs to not be sent to the server, which *could* potentially be used to avoid bans when botting or auto-completing adventures (though this is highly speculative and not guaranteed).
 
 ---
 
